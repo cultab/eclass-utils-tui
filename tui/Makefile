@@ -8,7 +8,10 @@ tidy:
 	go mod tidy
 	@touch tidy
 
-run:
-	go run main.go ${RUNFLAGS}
+clean:
+	rm -f ./eclass-tui ./tidy
 
-.PHONY: run build # not tidy
+run: build
+	./eclass-tui ${RUNFLAGS}
+
+.PHONY: run build clean # not tidy
