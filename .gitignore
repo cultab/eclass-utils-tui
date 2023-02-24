@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Binaries for programs and plugins
 *.exe
 *.exe~
@@ -14,7 +13,7 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
-=======
-/tui/eclass-tui
 
->>>>>>> d2d5432 (init)
+# tui binary
+/tui/eclass-tui
+/tui/tidy
