@@ -15,7 +15,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	lip "github.com/charmbracelet/lipgloss"
 )
 
 type listModel struct {
@@ -44,8 +44,8 @@ func NewList() listModel {
 	m.list.StatusMessageLifetime = statusTime
 	m.list.SetStatusBarItemName("Εργασία", "Εργασίες")
 	m.list.SetSpinner(spinner.Dot)
-    // TODO: this looks like a bubbletea bug, spinner's style is unused in list/list.go
-	// m.list.Styles.Spinner = lipgloss.NewStyle().Background(uniwaOrange).Border(lipgloss.DoubleBorder())
+	// TODO: this looks like a bubbletea bug, spinner's style is unused in list/list.go
+	// m.list.Styles.Spinner = lip.NewStyle().Background(uniwaOrange).Border(lip.DoubleBorder())
 	m.list.StartSpinner()
 	m.list.AdditionalShortHelpKeys = func() []key.Binding {
 		return []key.Binding{
@@ -88,7 +88,7 @@ func (m listModel) Init() tea.Cmd {
 	)
 }
 
-var docStyle = lipgloss.NewStyle().Margin(1, 2)
+var docStyle = lip.NewStyle().Margin(1, 2)
 
 type updateMsg struct{}
 
@@ -123,7 +123,6 @@ func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if !ok {
 				log.Print("Type Assertion failed")
 			}
-			// toggle hidden
 			hidden := false
 			for hidden_ass := range m.hiddenCourses {
 				if hidden_ass == i.assignment.Course.ID {
@@ -155,11 +154,13 @@ func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			for hidden_ass := range m.hiddenAssignments {
 				if hidden_ass == item.assignment.ID {
 					hidden = true
+					break
 				}
 			}
 			for hidden_course := range m.hiddenCourses {
 				if hidden_course == item.assignment.Course.ID {
 					hidden = true
+					break
 				}
 			}
 
@@ -207,28 +208,29 @@ func (i item) FilterValue() string { // TODO: keybinds to change this func to ot
 type itemDelegate struct{}
 
 var (
-	uniwaBlue      = lipgloss.Color("#0b365b")
-	uniwaLightBlue = lipgloss.Color("#6eaede")
-	uniwaOrange    = lipgloss.Color("#e67c17")
-	itemStyle      = lipgloss.NewStyle().
+	uniwaBlue      = lip.Color("#0b365b")
+	hoverBg        = lip.Color("#030F27")
+	uniwaLightBlue = lip.Color("#6eaede")
+	uniwaOrange    = lip.Color("#e67c17")
+	baseStyle      = lip.NewStyle().
 			PaddingLeft(4).
-			BorderLeft(true).
-			BorderStyle(lipgloss.HiddenBorder()).
-			Foreground(lipgloss.Color("#777777")).
+			Foreground(lip.Color("#777777")).
 			Faint(true)
-	itemTitleStyle = lipgloss.NewStyle().
+	titleStyle = baseStyle.Copy().
 			PaddingLeft(2).
-			BorderLeft(true).
-			BorderStyle(lipgloss.HiddenBorder()).
+			UnsetForeground().
 			Bold(true)
-	hoverItemStyle = itemStyle.Copy().
-			BorderStyle(lipgloss.ThickBorder()).
+	lateStyle = baseStyle.Copy().
+			Foreground(lip.Color("1"))
+	normalStyle = lip.NewStyle().
+			BorderStyle(lip.HiddenBorder()).
+			BorderLeft(true)
+	hoverStyle = lip.NewStyle().
+			BorderStyle(lip.ThickBorder()).
+			BorderLeft(true).
 			BorderForeground(uniwaBlue).
 			Foreground(uniwaLightBlue)
-	hoverItemTitleStyle = itemTitleStyle.Copy().
-				BorderStyle(lipgloss.NormalBorder()).
-				BorderForeground(uniwaBlue).
-				Foreground(uniwaLightBlue)
+            
 )
 
 func (itemD itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list.Item) {
@@ -237,26 +239,28 @@ func (itemD itemDelegate) Render(w io.Writer, m list.Model, index int, listItem 
 		return
 	}
 
-	var deadline string
-	if !time.Time.Equal(i.assignment.Deadline, time.Time{}) { // HACK: how to check for uninialized .Deadline
-		deadline = "Παράδωση εώς: " + i.assignment.Deadline.Format("02/01/2006 15:04:05")
+	var title, course, date string
+
+	title = titleStyle.Render(i.assignment.Title)
+	course = baseStyle.Render(i.assignment.Course.Name)
+
+	if i.assignment.Deadline.Before(time.Now()) {
+		date = lateStyle.Render("Εκπρόθεσμη  : ")
+	} else {
+		date = baseStyle.Render("Παράδωση εώς: ")
 	}
 
-	item_style := itemStyle.Copy()
-	title_style := itemTitleStyle.Copy()
-	item_style.Underline(i.selected)
-	title_style.Underline(i.selected)
+	date += baseStyle.Render(i.assignment.Deadline.Format("02/01/2006 15:04:05"))
+
+    result := lip.JoinVertical(lip.Left, title, course, date)
 
 	if index == m.Index() {
-		item_style = hoverItemStyle
-		title_style = hoverItemTitleStyle
-
+		result = hoverStyle.Render(result)
+	} else {
+		result = normalStyle.Render(result)
 	}
 
-	fmt.Fprint(w, title_style.Render(i.assignment.Title)+"\n")      // title
-	fmt.Fprint(w, item_style.Render(i.assignment.Course.Name)+"\n") // course
-	fmt.Fprint(w, item_style.Render(deadline))                      // deadline
-
+	fmt.Fprint(w, result)
 }
 
 func (itemD itemDelegate) Height() int {
@@ -268,12 +272,6 @@ func (itemD itemDelegate) Spacing() int {
 }
 
 func (itemD itemDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		key := msg.String()
-		switch key {
-		}
-	}
 	return nil
 }
 
@@ -343,7 +341,7 @@ func mockGetAssignments() tea.Msg {
 				URL:  "https://some.random.url",
 			},
 			Title:    "Course #3",
-			Deadline: time.Now(),
+			Deadline: time.Now().Add(time.Hour),
 			IsSent:   false,
 		},
 	} // }}}
