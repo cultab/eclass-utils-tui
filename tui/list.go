@@ -7,16 +7,14 @@ import (
 	"time"
 
 	"github.com/Huray-hub/eclass-utils/assignments/assignment"
-	// "github.com/Huray-hub/eclass-utils/assignments/calendar"
 	"github.com/Huray-hub/eclass-utils/assignments/cmd/flags"
-	// "github.com/Huray-hub/eclass-utils/assignments/cmd/output"
 	"github.com/Huray-hub/eclass-utils/assignments/config"
 	"github.com/Huray-hub/eclass-utils/assignments/course"
 
-	tea "github.com/charmbracelet/bubbletea"
-	// "github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/spinner"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -26,6 +24,7 @@ type listModel struct {
 	showHidden        bool
 	hiddenAssignments map[string]struct{}
 	hiddenCourses     map[string]struct{}
+	keys              keyBinds
 }
 
 func NewList() listModel {
@@ -34,13 +33,51 @@ func NewList() listModel {
 		showHidden:        false,
 		hiddenAssignments: make(map[string]struct{}),
 		hiddenCourses:     make(map[string]struct{}),
+		keys:              newKeyBinds(),
 	}
 	m.list.Title = "Εργασίες"
-
+	m.list.SetShowStatusBar(true)
+    statusTime, err := time.ParseDuration("5s")
+    if err != nil {
+        log.Fatal("Parsing status message duration failed.")
+    }
+    m.list.StatusMessageLifetime = statusTime
+	m.list.SetStatusBarItemName("Εργασία", "Εργασίες")
 	m.list.SetSpinner(spinner.Dot)
 	m.list.Styles.Spinner = lipgloss.NewStyle().Foreground(lipgloss.Color("69"))
 	m.list.StartSpinner()
+	m.list.AdditionalShortHelpKeys = func() []key.Binding {
+		return []key.Binding{
+
+			m.keys.toggleHidden,
+			m.keys.toggleHideCourse,
+			m.keys.toggleHideAssignment,
+		}
+	}
 	return m
+}
+
+type keyBinds struct {
+	toggleHideAssignment key.Binding
+	toggleHideCourse     key.Binding
+	toggleHidden         key.Binding
+}
+
+func newKeyBinds() keyBinds {
+	return keyBinds{
+		toggleHideAssignment: key.NewBinding(
+			key.WithKeys("c", "ψ"),
+			key.WithHelp("c|ψ", "Κρύψε εργασία"),
+		),
+		toggleHideCourse: key.NewBinding(
+			key.WithKeys("x", "θ"),
+			key.WithHelp("x|θ", "Κρύψε μάθημα"),
+		),
+		toggleHidden: key.NewBinding(
+			key.WithKeys(tea.KeySpace.String()),
+			key.WithHelp("space", "Εμφάνησε κρυμένες εργασίες"),
+		),
+	}
 }
 
 func (m listModel) Init() tea.Cmd {
@@ -61,14 +98,13 @@ func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		key := msg.String()
-		switch key {
-		case "a":
+		switch {
+		case key.Matches(msg, m.keys.toggleHideAssignment):
 			i, ok := m.list.SelectedItem().(item)
 			if !ok {
 				log.Print("Type Assertion failed")
 			}
-            // toggle hidden
+			// toggle hidden
 			hidden := false
 			for hidden_ass := range m.hiddenAssignments {
 				if hidden_ass == i.assignment.ID {
@@ -76,32 +112,32 @@ func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			if hidden {
-                delete(m.hiddenAssignments, i.assignment.ID)
+				delete(m.hiddenAssignments, i.assignment.ID)
 			} else {
-                m.hiddenAssignments[i.assignment.ID] = struct{}{}
+				m.hiddenAssignments[i.assignment.ID] = struct{}{}
 			}
-			return m, updateCmd
-		case "c":
+			statusCmd := m.list.NewStatusMessage("Έκρυψες την εργασία " + i.assignment.Title + ".")
+			return m, tea.Batch(updateCmd, statusCmd)
+		case key.Matches(msg, m.keys.toggleHideCourse):
 			i, ok := m.list.SelectedItem().(item)
 			if !ok {
 				log.Print("Type Assertion failed")
 			}
-            // toggle hidden
+			// toggle hidden
 			hidden := false
-			for hidden_ass := range m.hiddenCourses{
+			for hidden_ass := range m.hiddenCourses {
 				if hidden_ass == i.assignment.Course.ID {
 					hidden = true
 				}
 			}
 			if hidden {
-                delete(m.hiddenCourses, i.assignment.Course.ID)
+				delete(m.hiddenCourses, i.assignment.Course.ID)
 			} else {
-                m.hiddenCourses[i.assignment.Course.ID] = struct{}{}
+				m.hiddenCourses[i.assignment.Course.ID] = struct{}{}
 			}
-			return m, updateCmd
-		case "ctrl+c":
-			return m, tea.Quit
-		case tea.KeySpace.String():
+			statusCmd := m.list.NewStatusMessage("Έκρυψες τις εργασίες του μαθήματος " + i.assignment.Course.Name + ".")
+			return m, tea.Batch(updateCmd, statusCmd)
+		case key.Matches(msg, m.keys.toggleHidden):
 			m.showHidden = !m.showHidden
 			return m, updateCmd
 		}
@@ -109,7 +145,7 @@ func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		h, v := docStyle.GetFrameSize()
 		m.list.SetSize(msg.Width-h, msg.Height-v)
 	case updateMsg:
-        log.Print("Update list of assignments from cache")
+		log.Print("Update list of assignments from cache")
 		for item := range m.list.Items() { // remove all items
 			m.list.RemoveItem(item)
 		}
@@ -140,7 +176,8 @@ func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		log.Print("Loaded assignments")
 		m.list.StopSpinner()
-		return m, updateCmd
+		statusCmd := m.list.NewStatusMessage("Φόρτωση επιτυχής!")
+		return m, tea.Batch(updateCmd, statusCmd)
 	case errorMsg:
 		log.Print(msg.err)
 		return m, nil
@@ -179,7 +216,7 @@ var (
 			BorderStyle(lipgloss.HiddenBorder()).
 			Bold(true)
 	hoverItemStyle = itemStyle.Copy().
-			BorderStyle(lipgloss.NormalBorder()).
+			BorderStyle(lipgloss.ThickBorder()).
 			BorderForeground(lipgloss.Color("#0b365b")).
 			Foreground(lipgloss.Color("#6eaede"))
 	hoverItemTitleStyle = itemTitleStyle.Copy().
