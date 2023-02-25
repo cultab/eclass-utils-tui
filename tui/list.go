@@ -37,18 +37,18 @@ func NewList() listModel {
 	}
 	m.list.Title = "Εργασίες"
 	m.list.SetShowStatusBar(true)
-    statusTime, err := time.ParseDuration("5s")
-    if err != nil {
-        log.Fatal("Parsing status message duration failed.")
-    }
-    m.list.StatusMessageLifetime = statusTime
+	statusTime, err := time.ParseDuration("5s")
+	if err != nil {
+		log.Fatal("Parsing status message duration failed.")
+	}
+	m.list.StatusMessageLifetime = statusTime
 	m.list.SetStatusBarItemName("Εργασία", "Εργασίες")
 	m.list.SetSpinner(spinner.Dot)
-	m.list.Styles.Spinner = lipgloss.NewStyle().Foreground(lipgloss.Color("69"))
+    // TODO: this looks like a bubbletea bug, spinner's style is unused in list/list.go
+	// m.list.Styles.Spinner = lipgloss.NewStyle().Background(uniwaOrange).Border(lipgloss.DoubleBorder())
 	m.list.StartSpinner()
 	m.list.AdditionalShortHelpKeys = func() []key.Binding {
 		return []key.Binding{
-
 			m.keys.toggleHidden,
 			m.keys.toggleHideCourse,
 			m.keys.toggleHideAssignment,
@@ -175,7 +175,9 @@ func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cache = append(m.cache, it.(item))
 		}
 		log.Print("Loaded assignments")
-		m.list.StopSpinner()
+		if len(msg) > 5 {
+			m.list.StopSpinner()
+		}
 		statusCmd := m.list.NewStatusMessage("Φόρτωση επιτυχής!")
 		return m, tea.Batch(updateCmd, statusCmd)
 	case errorMsg:
@@ -205,10 +207,14 @@ func (i item) FilterValue() string { // TODO: keybinds to change this func to ot
 type itemDelegate struct{}
 
 var (
-	itemStyle = lipgloss.NewStyle().
+	uniwaBlue      = lipgloss.Color("#0b365b")
+	uniwaLightBlue = lipgloss.Color("#6eaede")
+	uniwaOrange    = lipgloss.Color("#e67c17")
+	itemStyle      = lipgloss.NewStyle().
 			PaddingLeft(4).
 			BorderLeft(true).
 			BorderStyle(lipgloss.HiddenBorder()).
+			Foreground(lipgloss.Color("#777777")).
 			Faint(true)
 	itemTitleStyle = lipgloss.NewStyle().
 			PaddingLeft(2).
@@ -217,12 +223,12 @@ var (
 			Bold(true)
 	hoverItemStyle = itemStyle.Copy().
 			BorderStyle(lipgloss.ThickBorder()).
-			BorderForeground(lipgloss.Color("#0b365b")).
-			Foreground(lipgloss.Color("#6eaede"))
+			BorderForeground(uniwaBlue).
+			Foreground(uniwaLightBlue)
 	hoverItemTitleStyle = itemTitleStyle.Copy().
 				BorderStyle(lipgloss.NormalBorder()).
-				BorderForeground(lipgloss.Color("#0b365b")).
-				Foreground(lipgloss.Color("#6eaede"))
+				BorderForeground(uniwaBlue).
+				Foreground(uniwaLightBlue)
 )
 
 func (itemD itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list.Item) {
