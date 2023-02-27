@@ -12,8 +12,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-var configuration_options *config.Options
-
 func init() {
 	homeCache, err := os.UserCacheDir()
 	if err != nil {
@@ -44,10 +42,6 @@ func init() {
 
 	log.SetOutput(file)
 
-	configuration_options, _, err = config.Import()
-	if err != nil {
-		log.Fatal(err)
-	}
 }
 
 func updateConfiguration(o config.Options) {
@@ -55,8 +49,17 @@ func updateConfiguration(o config.Options) {
 }
 
 func main() {
+    opts, creds, err := config.Import()
+	if err != nil {
+		log.Fatal(err)
+	}
+    config := config.Config{
+        Credentials: *creds,
+        Options: *opts,
+    }
 
-    m := NewList()
+    // config.Options.ExcludedCourses[""] = struct{}{}
+    m := NewList(config)
 	p := tea.NewProgram(m)
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)

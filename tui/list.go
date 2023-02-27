@@ -19,28 +19,30 @@ import (
 )
 
 type listModel struct {
-	list              list.Model
-	cache             []item
-	showHidden        bool
-	hiddenAssignments map[string]struct{}
-	hiddenCourses     map[string]struct{}
-	keys              keyBinds
+	list       list.Model
+	cache      []item
+	showHidden bool
+	keys       keyBinds
+	config     config.Config
 }
 
-func NewList() listModel {
+func NewList(config config.Config) listModel {
+	if config.Options.ExcludedAssignments == nil { // FIX: should't these be already made?
+		config.Options.ExcludedAssignments = make(map[string][]string)
+	}
+	if config.Options.ExcludedCourses == nil {
+		config.Options.ExcludedCourses = make(map[string]struct{})
+	}
+
 	m := listModel{
-		list:              list.New([]list.Item{}, itemDelegate{}, 0, 0),
-		showHidden:        false,
-		hiddenAssignments: make(map[string]struct{}),
-		hiddenCourses:     make(map[string]struct{}),
-		keys:              newKeyBinds(),
+		list:       list.New([]list.Item{}, itemDelegate{}, 0, 0),
+		showHidden: false,
+		keys:       newKeyBinds(),
+		config:     config,
 	}
 	m.list.Title = "Εργασίες"
 	m.list.SetShowStatusBar(true)
-	statusTime, err := time.ParseDuration("5s")
-	if err != nil {
-		log.Fatal("Parsing status message duration failed.")
-	}
+    statusTime := time.Second * 2
 	m.list.StatusMessageLifetime = statusTime
 	m.list.SetStatusBarItemName("Εργασία", "Εργασίες")
 	m.list.SetSpinner(spinner.Dot)
@@ -52,6 +54,7 @@ func NewList() listModel {
 			m.keys.toggleHidden,
 			m.keys.toggleHideCourse,
 			m.keys.toggleHideAssignment,
+			m.keys.saveConfig,
 		}
 	}
 	return m
@@ -61,6 +64,7 @@ type keyBinds struct {
 	toggleHideAssignment key.Binding
 	toggleHideCourse     key.Binding
 	toggleHidden         key.Binding
+	saveConfig           key.Binding
 }
 
 func newKeyBinds() keyBinds {
@@ -77,6 +81,10 @@ func newKeyBinds() keyBinds {
 			key.WithKeys(tea.KeySpace.String()),
 			key.WithHelp("space", "Εμφάνησε κρυμένες εργασίες"),
 		),
+		saveConfig: key.NewBinding(
+			key.WithKeys("s", "σ"),
+			key.WithHelp("s|σ", "Αποθήκευση"),
+		),
 	}
 }
 
@@ -90,6 +98,10 @@ func (m listModel) Init() tea.Cmd {
 
 var docStyle = lip.NewStyle().Margin(1, 2)
 
+type writeConfigMsg struct{}
+
+func writeConfigCmd() tea.Msg { return writeConfigMsg{} }
+
 type updateMsg struct{}
 
 func updateCmd() tea.Msg { return updateMsg{} }
@@ -99,6 +111,13 @@ func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch {
+		case key.Matches(msg, m.keys.saveConfig):
+			err := config.Export(m.config.Options, m.config.Credentials)
+			if err != nil {
+				return m, errorCmd(err)
+			}
+			cmd := m.list.NewStatusMessage("Αποθηκέυση επιτυχής!")
+			return m, cmd
 		case key.Matches(msg, m.keys.toggleHideAssignment):
 			i, ok := m.list.SelectedItem().(item)
 			if !ok {
@@ -106,15 +125,15 @@ func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			// toggle hidden
 			hidden := false
-			for hidden_ass := range m.hiddenAssignments {
+			for hidden_ass := range m.config.Options.ExcludedAssignments {
 				if hidden_ass == i.assignment.ID {
 					hidden = true
 				}
 			}
 			if hidden {
-				delete(m.hiddenAssignments, i.assignment.ID)
+				delete(m.config.Options.ExcludedAssignments, i.assignment.ID)
 			} else {
-				m.hiddenAssignments[i.assignment.ID] = struct{}{}
+				m.config.Options.ExcludedAssignments[i.assignment.ID] = []string{} // HACK: uhh what do we put here again?
 			}
 			statusCmd := m.list.NewStatusMessage("Έκρυψες την εργασία " + i.assignment.Title + ".")
 			return m, tea.Batch(updateCmd, statusCmd)
@@ -124,15 +143,15 @@ func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				log.Print("Type Assertion failed")
 			}
 			hidden := false
-			for hidden_ass := range m.hiddenCourses {
+			for hidden_ass := range m.config.Options.ExcludedCourses {
 				if hidden_ass == i.assignment.Course.ID {
 					hidden = true
 				}
 			}
 			if hidden {
-				delete(m.hiddenCourses, i.assignment.Course.ID)
+				delete(m.config.Options.ExcludedCourses, i.assignment.Course.ID)
 			} else {
-				m.hiddenCourses[i.assignment.Course.ID] = struct{}{}
+				m.config.Options.ExcludedCourses[i.assignment.Course.ID] = struct{}{}
 			}
 			statusCmd := m.list.NewStatusMessage("Έκρυψες τις εργασίες του μαθήματος " + i.assignment.Course.Name + ".")
 			return m, tea.Batch(updateCmd, statusCmd)
@@ -151,13 +170,13 @@ func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var new_items []list.Item
 		for _, item := range m.cache {
 			var hidden = false
-			for hidden_ass := range m.hiddenAssignments {
+			for hidden_ass := range m.config.Options.ExcludedAssignments {
 				if hidden_ass == item.assignment.ID {
 					hidden = true
 					break
 				}
 			}
-			for hidden_course := range m.hiddenCourses {
+			for hidden_course := range m.config.Options.ExcludedCourses {
 				if hidden_course == item.assignment.Course.ID {
 					hidden = true
 					break
@@ -176,7 +195,7 @@ func (m listModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cache = append(m.cache, it.(item))
 		}
 		log.Print("Loaded assignments")
-		if len(msg) > 5 {
+        if len(msg) > 5 { // NOTE: mockGetAssignments returns 5, this is a hack
 			m.list.StopSpinner()
 		}
 		statusCmd := m.list.NewStatusMessage("Φόρτωση επιτυχής!")
@@ -198,16 +217,13 @@ func (m listModel) View() string {
 
 type item struct {
 	assignment assignment.Assignment
-	selected   bool
 }
 
 func (i item) FilterValue() string { // TODO: keybinds to change this func to others
-	return i.assignment.Course.Name
+	return i.assignment.Title
 }
 
-type itemDelegate struct{}
-
-var (
+var ( // {{{
 	uniwaBlue      = lip.Color("#0b365b")
 	hoverBg        = lip.Color("#030F27")
 	uniwaLightBlue = lip.Color("#6eaede")
@@ -222,6 +238,8 @@ var (
 			Bold(true)
 	lateStyle = baseStyle.Copy().
 			Foreground(lip.Color("1"))
+	doneStyle = baseStyle.Copy().
+			Foreground(lip.Color("2"))
 	normalStyle = lip.NewStyle().
 			BorderStyle(lip.HiddenBorder()).
 			BorderLeft(true)
@@ -230,8 +248,9 @@ var (
 			BorderLeft(true).
 			BorderForeground(uniwaBlue).
 			Foreground(uniwaLightBlue)
-            
-)
+) // }}}
+
+type itemDelegate struct{}
 
 func (itemD itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list.Item) {
 	i, ok := listItem.(item)
@@ -244,15 +263,19 @@ func (itemD itemDelegate) Render(w io.Writer, m list.Model, index int, listItem 
 	title = titleStyle.Render(i.assignment.Title)
 	course = baseStyle.Render(i.assignment.Course.Name)
 
-	if i.assignment.Deadline.Before(time.Now()) {
-		date = lateStyle.Render("Εκπρόθεσμη  : ")
+	if i.assignment.IsSent {
+		date = doneStyle.Render("Παραδώθηκε πριν της:")
 	} else {
-		date = baseStyle.Render("Παράδωση εώς: ")
+		if i.assignment.Deadline.Before(time.Now()) {
+			date = lateStyle.Render("Εκπρόθεσμη:         ")
+		} else {
+			date = baseStyle.Render("Παράδωση εώς:       ")
+		}
 	}
 
 	date += baseStyle.Render(i.assignment.Deadline.Format("02/01/2006 15:04:05"))
 
-    result := lip.JoinVertical(lip.Left, title, course, date)
+	result := lip.JoinVertical(lip.Left, title, course, date)
 
 	if index == m.Index() {
 		result = hoverStyle.Render(result)
@@ -278,8 +301,16 @@ func (itemD itemDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
 type itemsMsg []list.Item
 type errorMsg struct{ err error }
 
+func errorCmd(err error) tea.Cmd {
+	return func() tea.Msg {
+		return errorMsg{err}
+	}
+}
+
 func (e errorMsg) Error() string { return e.err.Error() }
 
+// getAssignments gets ALL the assignments from eclass,
+// even excluded  ones, we filter them out later
 func getAssignments() tea.Msg {
 	log.Print("Loading assignments from eclass..")
 	opts, creds, err := config.Import()
@@ -293,6 +324,10 @@ func getAssignments() tea.Msg {
 	if err != nil {
 		return errorMsg{err}
 	}
+
+	// get ALL assignments
+	opts.ExcludedAssignments = make(map[string][]string)
+	opts.ExcludedCourses = make(map[string]struct{})
 
 	a, err := assignment.Get(opts, creds)
 	if err != nil {
@@ -320,7 +355,7 @@ func mockGetAssignments() tea.Msg {
 			},
 			Title:    "Course #1",
 			Deadline: time.Now(),
-			IsSent:   false,
+			IsSent:   true,
 		},
 		{
 			ID: "A2",
