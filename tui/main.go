@@ -7,8 +7,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"assignments/config"
+
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/Huray-hub/eclass-utils/assignments/config"
 )
 
 var configuration_options *config.Options

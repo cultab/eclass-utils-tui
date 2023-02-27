@@ -6,10 +6,10 @@ import (
 	"log"
 	"time"
 
-	"github.com/Huray-hub/eclass-utils/assignments/assignment"
-	"github.com/Huray-hub/eclass-utils/assignments/cmd/flags"
-	"github.com/Huray-hub/eclass-utils/assignments/config"
-	"github.com/Huray-hub/eclass-utils/assignments/course"
+	"assignments/assignment"
+	"assignments/cmd/flags"
+	"assignments/config"
+	"assignments/course"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
