@@ -1,8 +1,16 @@
-GOFLAGS=-v
-RUNFLAGS=-i
+GOFLAGS = -v
+RUNFLAGS = -i
+
+PREFIX = /usr/local/
+
+all: options build
+
+options:
+	@echo "compile options:"
+	@echo "GOFLAGS  = $(GOFLAGS)"
 
 build: tidy
-	go build ${GOFLAGS} -o eclass-tui
+	go build $(GOFLAGS) -o eclass-tui
 
 tidy:
 	go mod tidy
@@ -12,6 +20,15 @@ clean:
 	rm -f ./eclass-tui ./tidy
 
 run: build
-	./eclass-tui ${RUNFLAGS}
+	./eclass-tui $(RUNFLAGS)
 
-.PHONY: run build clean # not tidy
+install: build
+	@echo "Installing into $(DESTDIR)$(PREFIX)bin/.."
+	cp -f eclass-tui $(DESTDIR)$(PREFIX)bin/eclass-tui
+	chmod 755        $(DESTDIR)$(PREFIX)bin/eclass-tui
+
+uninstall:
+	@echo "Uninstalling from $(DESTDIR)$(PREFIX)bin/.."
+	rm -f $(DESTDIR)$(PREFIX)bin/eclass-tui
+
+.PHONY: run build clean install uninstall options all # not tidy
