@@ -4,7 +4,7 @@ import (
 	"flag"
 	"strings"
 
-	"github.com/Huray-hub/eclass-utils/assignments/config"
+	"assignments/config"
 )
 
 func Read(opts *config.Options, creds *config.Credentials) {

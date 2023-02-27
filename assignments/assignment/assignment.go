@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Huray-hub/eclass-utils/assignments/course"
+	"assignments/course"
 	"github.com/gocolly/colly"
 )
 

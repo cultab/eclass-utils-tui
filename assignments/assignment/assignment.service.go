@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Huray-hub/eclass-utils/assignments/config"
-	"github.com/Huray-hub/eclass-utils/assignments/course"
-	"github.com/Huray-hub/eclass-utils/assignments/login"
+	"assignments/config"
+	"assignments/course"
+	"assignments/login"
 	"github.com/gocolly/colly"
 )
 

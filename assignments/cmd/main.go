@@ -7,11 +7,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/Huray-hub/eclass-utils/assignments/assignment"
-	"github.com/Huray-hub/eclass-utils/assignments/calendar"
-	"github.com/Huray-hub/eclass-utils/assignments/cmd/flags"
-	"github.com/Huray-hub/eclass-utils/assignments/cmd/output"
-	"github.com/Huray-hub/eclass-utils/assignments/config"
+	"assignments/assignment"
+	"assignments/calendar"
+	"assignments/cmd/flags"
+	"assignments/cmd/output"
+	"assignments/config"
 )
 
 func init() {

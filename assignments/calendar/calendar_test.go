@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Huray-hub/eclass-utils/assignments/assignment"
-	"github.com/Huray-hub/eclass-utils/assignments/calendar"
-	crs "github.com/Huray-hub/eclass-utils/assignments/course"
+	"assignments/assignment"
+	"assignments/calendar"
+	crs "assignments/course"
 )
 
 func TestExport(t *testing.T) {

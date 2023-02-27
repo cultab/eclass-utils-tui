@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
-	as "github.com/Huray-hub/eclass-utils/assignments/assignment"
+	as "assignments/assignment"
 	ics "github.com/arran4/golang-ical"
 )
 
