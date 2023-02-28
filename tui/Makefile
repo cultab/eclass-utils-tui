@@ -1,5 +1,5 @@
 GOFLAGS = -v
-RUNFLAGS = -i
+RUNFLAGS =
 
 PREFIX = /usr/local/
 
